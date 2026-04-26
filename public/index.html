@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Daily Widget</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="card">
+    <h2>Daily Widget</h2>
+
+    <div class="date">
+      Widget保持日付: <span id="widgetDate">読み込み中...</span>
+    </div>
+
+    <label>タイトル</label>
+    <input id="title" type="text" placeholder="タイトルを入力" />
+
+    <label>子項目</label>
+    <div id="items">
+      <div class="item">
+        <input type="text" placeholder="子項目を入力" />
+        <button class="remove-button" onclick="removeItem(this)">×</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button onclick="addItem()">子項目を追加</button>
+    </div>
+
+    <div class="note">
+      入力内容は自動で一時保存されます。日付が変わってもすぐにはリセットしません。
+      新しいNotionカードが作成され、そのカードへの書き込みが成功した場合だけリセットします。
+    </div>
+
+    <p id="message"></p>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
