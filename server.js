@@ -22,6 +22,8 @@ const notion = new Client({
 
 const databaseId = process.env.NOTION_DATABASE_ID;
 
+let cachedTitlePropertyName = null;
+
 function getTodayJSTText() {
   return getJSTDateText(new Date());
 }
@@ -53,6 +55,31 @@ function getJSTRangeISOByDateText(dateText) {
     start: startJST.toISOString(),
     end: endJST.toISOString(),
   };
+}
+
+async function getTitlePropertyName() {
+  if (process.env.NOTION_TITLE_PROPERTY) {
+    return process.env.NOTION_TITLE_PROPERTY;
+  }
+
+  if (cachedTitlePropertyName) {
+    return cachedTitlePropertyName;
+  }
+
+  const database = await notion.databases.retrieve({
+    database_id: databaseId,
+  });
+
+  const titleProperty = Object.entries(database.properties).find(
+    ([, property]) => property.type === "title"
+  );
+
+  if (!titleProperty) {
+    throw new Error("Notionデータベースにタイトルプロパティが見つかりません");
+  }
+
+  cachedTitlePropertyName = titleProperty[0];
+  return cachedTitlePropertyName;
 }
 
 async function findPageByJSTDate(dateText) {
@@ -108,7 +135,20 @@ app.post("/save-to-date", async (req, res) => {
     const safeTitle = title && title.trim() !== "" ? title.trim() : "無題";
 
     const safeItems = Array.isArray(items)
-      ? items.map((item) => String(item).trim()).filter((item) => item !== "")
+      ? items
+          .map((item) => {
+            return {
+              heading:
+                item.heading && String(item.heading).trim() !== ""
+                  ? String(item.heading).trim()
+                  : "無題",
+              body:
+                item.body && String(item.body).trim() !== ""
+                  ? String(item.body).trim()
+                  : "",
+            };
+          })
+          .filter((item) => item.heading !== "" || item.body !== "")
       : [];
 
     const targetPage = await findPageByJSTDate(safeTargetDate);
@@ -124,12 +164,14 @@ app.post("/save-to-date", async (req, res) => {
 
     const pageId = targetPage.id;
 
-    const children = [
-      {
-        object: "block",
-        type: "heading_2",
-        heading_2: {
-          rich_text: [
+    const titlePropertyName = await getTitlePropertyName();
+
+    // WidgetのタイトルをNotionカードのタイトルに反映
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        [titlePropertyName]: {
+          title: [
             {
               type: "text",
               text: {
@@ -139,29 +181,50 @@ app.post("/save-to-date", async (req, res) => {
           ],
         },
       },
-    ];
+    });
+
+    const children = [];
 
     for (const item of safeItems) {
       children.push({
         object: "block",
-        type: "bulleted_list_item",
-        bulleted_list_item: {
+        type: "heading_3",
+        heading_3: {
           rich_text: [
             {
               type: "text",
               text: {
-                content: item,
+                content: item.heading,
               },
             },
           ],
         },
       });
+
+      if (item.body !== "") {
+        children.push({
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [
+              {
+                type: "text",
+                text: {
+                  content: item.body,
+                },
+              },
+            ],
+          },
+        });
+      }
     }
 
-    await notion.blocks.children.append({
-      block_id: pageId,
-      children,
-    });
+    if (children.length > 0) {
+      await notion.blocks.children.append({
+        block_id: pageId,
+        children,
+      });
+    }
 
     res.json({
       ok: true,

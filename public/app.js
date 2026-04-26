@@ -1,4 +1,4 @@
-const STORAGE_KEY = "daily-widget-data-v2";
+const STORAGE_KEY = "daily-widget-data-v3";
 
 let widgetDate = null;
 let isChecking = false;
@@ -42,10 +42,19 @@ function getTodayJSTText() {
 function getCurrentFormData() {
   const title = document.getElementById("title").value.trim();
 
-  const itemInputs = document.querySelectorAll("#items input");
-  const items = Array.from(itemInputs)
-    .map((input) => input.value.trim())
-    .filter((text) => text !== "");
+  const itemDivs = document.querySelectorAll("#items .item");
+
+  const items = Array.from(itemDivs)
+    .map((div) => {
+      const headingInput = div.querySelector(".item-heading");
+      const bodyInput = div.querySelector(".item-body");
+
+      return {
+        heading: headingInput ? headingInput.value.trim() : "",
+        body: bodyInput ? bodyInput.value.trim() : "",
+      };
+    })
+    .filter((item) => item.heading !== "" || item.body !== "");
 
   return {
     widgetDate,
@@ -79,7 +88,7 @@ function loadFromLocalStorage(today) {
     widgetDate = data.widgetDate || today;
     document.getElementById("title").value = data.title || "";
 
-    renderItems(data.items && data.items.length > 0 ? data.items : [""]);
+    renderItems(data.items && data.items.length > 0 ? data.items : [{ heading: "", body: "" }]);
     updateDateView();
 
     setMessage("前回の入力内容を復元しました");
@@ -99,7 +108,8 @@ function renderItems(items) {
     div.className = "item";
 
     div.innerHTML = `
-      <input type="text" placeholder="子項目を入力" value="${escapeHtml(item)}" />
+      <input class="item-heading" type="text" placeholder="子項目の題目を入力" value="${escapeHtml(item.heading || "")}" />
+      <textarea class="item-body" placeholder="本文を入力">${escapeHtml(item.body || "")}</textarea>
       <button class="remove-button" onclick="removeItem(this)">×</button>
     `;
 
@@ -125,7 +135,8 @@ function addItem() {
   div.className = "item";
 
   div.innerHTML = `
-    <input type="text" placeholder="子項目を入力" />
+    <input class="item-heading" type="text" placeholder="子項目の題目を入力" />
+    <textarea class="item-body" placeholder="本文を入力"></textarea>
     <button class="remove-button" onclick="removeItem(this)">×</button>
   `;
 
@@ -139,7 +150,9 @@ function removeItem(button) {
   const items = document.getElementById("items");
 
   if (items.children.length <= 1) {
-    button.parentElement.querySelector("input").value = "";
+    const itemDiv = button.parentElement;
+    itemDiv.querySelector(".item-heading").value = "";
+    itemDiv.querySelector(".item-body").value = "";
     saveToLocalStorage();
     return;
   }
@@ -154,7 +167,8 @@ function resetFormAfterSuccessfulWrite(newDate) {
   document.getElementById("title").value = "";
   document.getElementById("items").innerHTML = `
     <div class="item">
-      <input type="text" placeholder="子項目を入力" />
+      <input class="item-heading" type="text" placeholder="子項目の題目を入力" />
+      <textarea class="item-body" placeholder="本文を入力"></textarea>
       <button class="remove-button" onclick="removeItem(this)">×</button>
     </div>
   `;
@@ -181,7 +195,7 @@ function setMessage(text) {
 }
 
 function bindInputEvents() {
-  const inputs = document.querySelectorAll("input");
+  const inputs = document.querySelectorAll("input, textarea");
 
   inputs.forEach((input) => {
     input.oninput = () => {
@@ -212,6 +226,36 @@ async function writeToNewCard(data, newDate) {
   return result;
 }
 
+function showResult(data) {
+  const result = document.getElementById("result");
+  const resultContent = document.getElementById("resultContent");
+
+  result.classList.remove("hidden");
+
+  let html = "";
+
+  html += `<p><strong>タイトル:</strong> ${escapeHtml(data.title || "無題")}</p>`;
+
+  if (data.items.length === 0) {
+    html += `<p>書き込み内容はありません。</p>`;
+  } else {
+    html += `<div class="result-items">`;
+
+    for (const item of data.items) {
+      html += `
+        <div class="result-item">
+          <h4>${escapeHtml(item.heading || "無題")}</h4>
+          <p>${escapeHtml(item.body || "")}</p>
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+  }
+
+  resultContent.innerHTML = html;
+}
+
 async function checkDateAndNewCard() {
   if (isChecking) return;
 
@@ -239,6 +283,8 @@ async function checkDateAndNewCard() {
     );
 
     await writeToNewCard(currentData, today);
+
+    showResult(currentData);
 
     resetFormAfterSuccessfulWrite(today);
 

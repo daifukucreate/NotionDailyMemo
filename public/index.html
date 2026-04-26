@@ -16,16 +16,17 @@
     <label>タイトル</label>
     <input id="title" type="text" placeholder="タイトルを入力" />
 
-    <label>子項目</label>
+    <label>書き込み内容</label>
     <div id="items">
       <div class="item">
-        <input type="text" placeholder="子項目を入力" />
+        <input class="item-heading" type="text" placeholder="子項目の題目を入力" />
+        <textarea class="item-body" placeholder="本文を入力"></textarea>
         <button class="remove-button" onclick="removeItem(this)">×</button>
       </div>
     </div>
 
     <div class="row">
-      <button onclick="addItem()">子項目を追加</button>
+      <button onclick="addItem()">書き込み内容を追加</button>
     </div>
 
     <div class="note">
@@ -34,6 +35,11 @@
     </div>
 
     <p id="message"></p>
+
+    <div id="result" class="result hidden">
+      <h3>書き込み完了内容</h3>
+      <div id="resultContent"></div>
+    </div>
   </div>
 
   <script src="./app.js"></script>
